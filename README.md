@@ -27,9 +27,3 @@ python main.py
 - Semgrep (`pip install semgrep`)
 - OpenAI API key
 
-## Project
-
-- Student: Taiwo Victor Ayodele (A00059088)
-- Supervisor: Badis Aoun
-- University: University of Roehampton
-- Programme: MSc Cybersecurity 2024–2025
