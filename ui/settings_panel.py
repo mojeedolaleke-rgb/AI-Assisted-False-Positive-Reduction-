@@ -1,9 +1,12 @@
+import os
+from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFrame, QScrollArea, QComboBox,
-    QMessageBox
+    QMessageBox, QLineEdit
 )
 from PySide6.QtCore import Qt
+import config
 
 
 class SettingsPanel(QWidget):
@@ -17,6 +20,10 @@ class SettingsPanel(QWidget):
         self._refresh()
 
     def _refresh(self):
+        # Refresh API key display
+        if hasattr(self, "_api_input"):
+            self._api_input.setText(config.OPENAI_API_KEY or "")
+            self._update_api_status()
         try:
             from database.db_manager import DBManager
             db = DBManager()
@@ -105,6 +112,66 @@ class SettingsPanel(QWidget):
         layout = QVBoxLayout(content)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
+
+        # ── API Key card ──
+        api_card = QFrame()
+        api_card.setObjectName("section_card")
+        al = QVBoxLayout(api_card)
+        al.setContentsMargins(20, 18, 20, 18)
+        al.setSpacing(12)
+
+        api_hdr = QHBoxLayout()
+        api_hdr.setSpacing(10)
+        api_icon = QLabel("🔑")
+        api_icon.setFixedSize(36, 36)
+        api_icon.setAlignment(Qt.AlignCenter)
+        api_icon.setStyleSheet(
+            "background:#EEF2FF; border-radius:8px; font-size:18px;"
+            "border:1px solid #C7D2FE;"
+        )
+        api_title = QLabel("OpenAI API Key")
+        api_title.setStyleSheet(
+            "color:#1a1a2e; font-size:15px; font-weight:bold;"
+        )
+        api_hdr.addWidget(api_icon)
+        api_hdr.addWidget(api_title)
+        api_hdr.addStretch()
+        al.addLayout(api_hdr)
+
+        api_sub = QLabel(
+            "Your API key is stored in the .env file and never transmitted except to OpenAI."
+        )
+        api_sub.setStyleSheet("color:#6B7280; font-size:12px;")
+        api_sub.setWordWrap(True)
+        al.addWidget(api_sub)
+
+        api_row = QHBoxLayout()
+        api_row.setSpacing(10)
+        self._api_input = QLineEdit()
+        self._api_input.setEchoMode(QLineEdit.Password)
+        self._api_input.setPlaceholderText("sk-... paste your OpenAI API key here")
+        self._api_input.setFixedHeight(38)
+        self._api_input.setText(config.OPENAI_API_KEY or "")
+        api_row.addWidget(self._api_input)
+
+        save_btn = QPushButton("Save Key")
+        save_btn.setFixedWidth(110)
+        save_btn.setFixedHeight(38)
+        save_btn.setStyleSheet(
+            "QPushButton{background:#6c63ff;color:#ffffff;border:none;"
+            "border-radius:8px;font-size:12px;font-weight:bold;}"
+            "QPushButton:hover{background:#5a52d5;}"
+        )
+        save_btn.clicked.connect(self._save_api_key)
+        api_row.addWidget(save_btn)
+        al.addLayout(api_row)
+
+        self._api_status = QLabel("")
+        self._api_status.setStyleSheet("font-size:11px;")
+        al.addWidget(self._api_status)
+        self._update_api_status()
+
+        layout.addWidget(api_card)
 
         # ── Storage card ──
         sc, sl = self._section_card("🗄️", "Storage Management")
@@ -227,6 +294,39 @@ class SettingsPanel(QWidget):
 
         scroll.setWidget(content)
         outer.addWidget(scroll)
+
+    def _save_api_key(self):
+        key = self._api_input.text().strip()
+        if not key or not key.startswith("sk-"):
+            QMessageBox.warning(
+                self, "Invalid Key",
+                "Please enter a valid OpenAI API key starting with sk-"
+            )
+            return
+        env_path = Path(".env")
+        lines = []
+        if env_path.exists():
+            lines = env_path.read_text().splitlines()
+        new_lines = [l for l in lines if not l.startswith("OPENAI_API_KEY=")]
+        new_lines.append(f"OPENAI_API_KEY={key}")
+        env_path.write_text("\n".join(new_lines) + "\n")
+        config.OPENAI_API_KEY = key
+        os.environ["OPENAI_API_KEY"] = key
+        self._update_api_status()
+        QMessageBox.information(
+            self, "Saved",
+            "API key saved and active.\nReady to run AI validation."
+        )
+
+    def _update_api_status(self):
+        if config.OPENAI_API_KEY and config.OPENAI_API_KEY.startswith("sk-"):
+            self._api_status.setText("✅  API key is configured and active")
+            self._api_status.setStyleSheet("color:#10B981; font-size:11px;")
+        else:
+            self._api_status.setText(
+                "⚠️  No API key set — paste your key above and click Save Key"
+            )
+            self._api_status.setStyleSheet("color:#EF4444; font-size:11px;")
 
     def _delete_project(self):
         idx = self._combo.currentIndex()

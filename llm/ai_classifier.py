@@ -1,10 +1,8 @@
 import os
 import re
 import time
-from dotenv import load_dotenv
+import config
 from llm.prompt_builder import build_fp_prompt, build_severity_prompt
-
-load_dotenv()
 
 BATCH_SIZE  = 25
 MAX_RETRIES = 3
@@ -21,9 +19,9 @@ def _is_bad_cache(text: str) -> bool:
 
 def _call_openai(system_prompt: str, user_prompt: str, max_tokens=400) -> str:
     import openai
-    key = os.getenv("OPENAI_API_KEY", "")
+    key = config.OPENAI_API_KEY
     if not key:
-        raise ValueError("OPENAI_API_KEY not set in .env file")
+        raise ValueError("OpenAI API key not set. Go to Settings and paste your API key.")
     client = openai.OpenAI(api_key=key, timeout=TIMEOUT)
     last_err = None
     for attempt in range(MAX_RETRIES):
