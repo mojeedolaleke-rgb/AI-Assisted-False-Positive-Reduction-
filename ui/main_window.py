@@ -52,7 +52,6 @@ class MainWindow(QMainWindow):
         self._add_screens()
         self._switch(0)
         self._master.setCurrentIndex(1)
-        # Auto-load latest results from DB on startup
         self.results_panel.refresh_latest()
 
     def _build_sidebar(self):
@@ -113,32 +112,8 @@ class MainWindow(QMainWindow):
         settings_btn.clicked.connect(lambda: self._switch(5))
         self._nav_btns[5] = settings_btn
         layout.addWidget(settings_btn)
+        layout.addSpacing(10)
 
-        bc = QFrame()
-        bc.setStyleSheet("QFrame{background:#252540;border-radius:10px;margin:10px;}")
-        bc.setFixedHeight(100)
-        bl = QVBoxLayout(bc)
-        bl.setContentsMargins(14, 10, 14, 10)
-        bl.setSpacing(4)
-        bicon = QLabel("⚡")
-        bicon.setStyleSheet("font-size:20px;")
-        bt = QLabel("Scan. Validate. Classify.")
-        bt.setStyleSheet("color:#ffffff;font-size:10px;font-weight:bold;background:transparent;")
-        bs = QLabel("AI-powered SAST analysis")
-        bs.setStyleSheet("color:#8888aa;font-size:9px;background:transparent;")
-        bb = QPushButton("Start New Scan")
-        bb.setStyleSheet(
-            "QPushButton{background:#6c63ff;color:#ffffff;border:none;border-radius:6px;"
-            "padding:4px;font-size:10px;font-weight:bold;}"
-            "QPushButton:hover{background:#5a52d5;}"
-        )
-        bb.clicked.connect(lambda: self._switch(1))
-        bl.addWidget(bicon)
-        bl.addWidget(bt)
-        bl.addWidget(bs)
-        bl.addWidget(bb)
-        layout.addWidget(bc)
-        layout.addSpacing(4)
         return sidebar
 
     def _build_topbar(self):
@@ -195,8 +170,6 @@ class MainWindow(QMainWindow):
 
         self.upload_panel.scan_complete.connect(self._on_scan_complete)
         self.validate_panel.validation_complete.connect(self._on_validation_complete)
-
-        # Allow clicking a dashboard row to load that scan into validate/results
         self.dashboard.scan_selected.connect(self._on_dashboard_scan_selected)
 
     def _switch(self, index):
@@ -234,7 +207,6 @@ class MainWindow(QMainWindow):
         )
 
     def _on_dashboard_scan_selected(self, scan_id):
-        """Load findings from a past scan when clicked on the dashboard."""
         self.results_panel.load_from_scan_id(scan_id)
         self._switch(3)
         self.statusBar().showMessage(f"Loaded scan #{scan_id} — click a finding to view details")

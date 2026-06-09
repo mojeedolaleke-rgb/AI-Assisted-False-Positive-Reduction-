@@ -29,7 +29,8 @@ class ScanWorker(QObject):
             self.progress.emit(f"Found {len(findings)} raw findings. Saving to database...")
             db = DBManager()
             project_name = os.path.basename(self.path.rstrip("/\\"))
-            scan_id = db.save_scan(project_name, self.path, findings)
+            # Fix: pass len(findings) not findings list
+            scan_id = db.save_scan(project_name, self.path, len(findings))
             db.save_findings(scan_id, findings)
             self.progress.emit("Scan complete. Ready for AI validation.")
             self.finished.emit(findings, scan_id)
@@ -75,9 +76,7 @@ class UploadPanel(QWidget):
         tc = QVBoxLayout()
         tc.setSpacing(3)
         t1 = QLabel("Scan Code")
-        t1.setStyleSheet(
-            "color:#1a1a2e; font-size:18px; font-weight:bold;"
-        )
+        t1.setStyleSheet("color:#1a1a2e; font-size:18px; font-weight:bold;")
         t2 = QLabel("Select a project folder to scan for vulnerabilities using Semgrep")
         t2.setStyleSheet("color:#6B7280; font-size:12px;")
         tc.addWidget(t1)
@@ -88,13 +87,11 @@ class UploadPanel(QWidget):
         hdr.addStretch()
         cl.addLayout(hdr)
 
-        # Divider
         div = QFrame()
         div.setFrameShape(QFrame.HLine)
         div.setStyleSheet("background:#E5E7EB; max-height:1px;")
         cl.addWidget(div)
 
-        # Path row
         path_row = QHBoxLayout()
         path_row.setSpacing(10)
         self.path_edit = QLineEdit()
@@ -133,9 +130,7 @@ class UploadPanel(QWidget):
         il.setSpacing(10)
 
         it = QLabel("What happens when you scan")
-        it.setStyleSheet(
-            "color:#1a1a2e; font-size:13px; font-weight:bold;"
-        )
+        it.setStyleSheet("color:#1a1a2e; font-size:13px; font-weight:bold;")
         il.addWidget(it)
 
         steps = [

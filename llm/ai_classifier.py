@@ -53,7 +53,6 @@ def _call_openai(system_prompt: str, user_prompt: str, max_tokens=400) -> str:
     raise RuntimeError(last_err or "API call failed after retries")
 
 
-# ── Single finding (fallback only) ───────────────────────────
 def classify_false_positive(finding) -> dict:
     try:
         from database.db_manager import DBManager
@@ -99,7 +98,7 @@ def classify_severity(finding) -> dict:
         from database.db_manager import DBManager
         cached = DBManager().get_validation(finding.finding_id)
         if cached and cached.get("ai_severity"):
-            reason = cached.get("ai_severity_reason", "")
+            reason = cached.get("sev_reason", "")
             if not _is_bad_cache(reason):
                 return {"severity": cached["ai_severity"],
                         "reason": reason or "Loaded from cache."}
@@ -119,7 +118,6 @@ def classify_severity(finding) -> dict:
         return {"severity": finding.severity, "reason": f"AI analysis failed: {e}"}
 
 
-# ── Batch validation (main path) ──────────────────────────────
 def _build_batch_prompt(findings: list) -> str:
     lines = [
         "You are an expert security engineer specialising in SAST analysis.\n"
@@ -154,7 +152,6 @@ def _build_batch_prompt(findings: list) -> str:
 
 
 def _parse_batch_response(raw: str, findings: list) -> dict:
-    """Returns dict of finding_id -> (fp_result, sev_result)"""
     results = {}
     blocks = re.split(r"---END_FINDING---", raw)
 
@@ -174,7 +171,7 @@ def _parse_batch_response(raw: str, findings: list) -> dict:
         sev_match     = re.search(r"SEVERITY:\s*(CRITICAL|HIGH|MEDIUM|LOW|N/A)", block)
         sev_r_match   = re.search(r"SEV_REASON:\s*(.+?)(?=$)", block, re.DOTALL)
 
-        is_fp     = (verdict_match.group(1) == "FALSE_POSITIVE") if verdict_match else False
+        is_fp      = (verdict_match.group(1) == "FALSE_POSITIVE") if verdict_match else False
         confidence = conf_match.group(1) if conf_match else "MEDIUM"
         fp_reason  = fp_r_match.group(1).strip() if fp_r_match else ""
         severity   = sev_match.group(1) if sev_match else "MEDIUM"
@@ -190,21 +187,11 @@ def _parse_batch_response(raw: str, findings: list) -> dict:
     return results
 
 
-def validate_findings_batch(
-    findings: list,
-    progress_callback=None
-) -> list:
-    """
-    Validate all findings in batches of BATCH_SIZE.
-    Returns list of findings with validation attributes set.
-    Skips findings already in DB cache.
-    """
+def validate_findings_batch(findings: list, progress_callback=None) -> list:
     from database.db_manager import DBManager
     db = DBManager()
 
-    # Separate cached vs needs API
     needs_api = []
-    id_to_finding = {f.finding_id: f for f in findings}
 
     for f in findings:
         cached = db.get_validation(f.finding_id)
@@ -214,7 +201,7 @@ def validate_findings_batch(
                 f.is_false_positive  = bool(cached.get("is_false_positive", 0))
                 f.fp_reason          = fp_reason
                 f.ai_severity        = cached.get("ai_severity", f.severity)
-                f.ai_severity_reason = cached.get("ai_severity_reason", "")
+                f.ai_severity_reason = cached.get("sev_reason", "")
                 f.validated          = True
                 continue
         needs_api.append(f)
@@ -224,7 +211,6 @@ def validate_findings_batch(
             progress_callback("All findings loaded from cache.", len(findings), len(findings))
         return findings
 
-    # Split into batches
     batches = [needs_api[i:i + BATCH_SIZE] for i in range(0, len(needs_api), BATCH_SIZE)]
     processed = len(findings) - len(needs_api)
 
@@ -237,7 +223,6 @@ def validate_findings_batch(
 
         prompt = _build_batch_prompt(batch)
         batch_results = {}
-        success = False
 
         for attempt in range(MAX_RETRIES):
             try:
@@ -247,7 +232,6 @@ def validate_findings_batch(
                     max_tokens=min(4000, 160 * len(batch))
                 )
                 batch_results = _parse_batch_response(raw, batch)
-                success = True
                 break
             except Exception as e:
                 if "rate" in str(e).lower():
@@ -268,7 +252,6 @@ def validate_findings_batch(
                     f.ai_severity        = f.severity
                     f.ai_severity_reason = ""
             else:
-                # Parsing failed — fallback to single call
                 fp  = classify_false_positive(f)
                 sev = classify_severity(f) if not fp["is_false_positive"] else {"severity": f.severity, "reason": ""}
                 f.is_false_positive  = fp["is_false_positive"]
@@ -281,7 +264,7 @@ def validate_findings_batch(
             db.save_validation(
                 f.finding_id,
                 f.is_false_positive,
-                f.fp_reason,
+                getattr(f, "fp_reason", ""),
                 getattr(f, "ai_severity", f.severity),
                 getattr(f, "ai_severity_reason", ""),
                 f.severity,

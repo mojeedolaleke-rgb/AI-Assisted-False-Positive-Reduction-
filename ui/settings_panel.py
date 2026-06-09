@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -7,6 +8,17 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 import config
+
+
+def _get_app_dir() -> str:
+    if getattr(sys, 'frozen', False):
+        app_data = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
+        app_dir = os.path.join(app_data, "SentinelAI")
+    else:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        app_dir = os.path.join(app_dir, "..")
+    os.makedirs(app_dir, exist_ok=True)
+    return app_dir
 
 
 class SettingsPanel(QWidget):
@@ -20,7 +32,6 @@ class SettingsPanel(QWidget):
         self._refresh()
 
     def _refresh(self):
-        # Refresh API key display
         if hasattr(self, "_api_input"):
             self._api_input.setText(config.OPENAI_API_KEY or "")
             self._update_api_status()
@@ -62,9 +73,7 @@ class SettingsPanel(QWidget):
         cl.setContentsMargins(16, 8, 16, 8)
         cl.setSpacing(3)
         val = QLabel("0")
-        val.setStyleSheet(
-            f"color:{color}; font-size:22px; font-weight:bold;"
-        )
+        val.setStyleSheet(f"color:{color}; font-size:22px; font-weight:bold;")
         lbl = QLabel(label)
         lbl.setStyleSheet("color:#6B7280; font-size:10px;")
         cl.addWidget(val)
@@ -78,7 +87,6 @@ class SettingsPanel(QWidget):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(20, 18, 20, 18)
         layout.setSpacing(14)
-
         hdr = QHBoxLayout()
         hdr.setSpacing(10)
         i = QLabel(icon)
@@ -89,9 +97,7 @@ class SettingsPanel(QWidget):
             "border:1px solid #C7D2FE; color:#6c63ff;"
         )
         t = QLabel(title)
-        t.setStyleSheet(
-            "color:#1a1a2e; font-size:15px; font-weight:bold;"
-        )
+        t.setStyleSheet("color:#1a1a2e; font-size:15px; font-weight:bold;")
         hdr.addWidget(i)
         hdr.addWidget(t)
         hdr.addStretch()
@@ -130,16 +136,14 @@ class SettingsPanel(QWidget):
             "border:1px solid #C7D2FE;"
         )
         api_title = QLabel("OpenAI API Key")
-        api_title.setStyleSheet(
-            "color:#1a1a2e; font-size:15px; font-weight:bold;"
-        )
+        api_title.setStyleSheet("color:#1a1a2e; font-size:15px; font-weight:bold;")
         api_hdr.addWidget(api_icon)
         api_hdr.addWidget(api_title)
         api_hdr.addStretch()
         al.addLayout(api_hdr)
 
         api_sub = QLabel(
-            "Your API key is stored in the .env file and never transmitted except to OpenAI."
+            "Your API key is stored securely on your PC and never transmitted except to OpenAI."
         )
         api_sub.setStyleSheet("color:#6B7280; font-size:12px;")
         api_sub.setWordWrap(True)
@@ -170,14 +174,12 @@ class SettingsPanel(QWidget):
         self._api_status.setStyleSheet("font-size:11px;")
         al.addWidget(self._api_status)
         self._update_api_status()
-
         layout.addWidget(api_card)
 
         # ── Storage card ──
         sc, sl = self._section_card("🗄️", "Storage Management")
-
         sub = QLabel(
-            "All scan data is stored locally in a SQLite database. "
+            "All scan data is stored locally on your PC. "
             "Nothing is sent anywhere except the OpenAI API for AI classification."
         )
         sub.setStyleSheet("color:#6B7280; font-size:12px;")
@@ -266,19 +268,17 @@ class SettingsPanel(QWidget):
         layout.addWidget(sc)
 
         # ── About card ──
-        ac, al = self._section_card("ℹ️", "About SentinelAI")
-
-        rows = [
+        ac, abl = self._section_card("ℹ️", "About SentinelAI")
+        for key, val in [
             ("Application",   "SentinelAI — SAST Validation and Severity Classification"),
             ("Version",       "v1.0"),
-            ("Student",       "Taiwo Victor Ayodele"),
-            ("Student ID",    "A00059088"),
+            ("Student",       "Mojeed Olaleke Salako"),
+            ("Student ID",    "A00074464"),
             ("Supervisor",    "Badis Aoun"),
             ("University",    "University of Roehampton"),
             ("Programme",     "MSc Cybersecurity"),
-            ("Academic Year", "2024 to 2025"),
-        ]
-        for key, val in rows:
+            ("Academic Year", "2025 to 2026"),
+        ]:
             row = QHBoxLayout()
             kl = QLabel(f"{key}:")
             kl.setFixedWidth(120)
@@ -288,7 +288,7 @@ class SettingsPanel(QWidget):
             row.addWidget(kl)
             row.addWidget(vl)
             row.addStretch()
-            al.addLayout(row)
+            abl.addLayout(row)
         layout.addWidget(ac)
         layout.addStretch()
 
@@ -303,20 +303,23 @@ class SettingsPanel(QWidget):
                 "Please enter a valid OpenAI API key starting with sk-"
             )
             return
-        env_path = Path(".env")
-        lines = []
-        if env_path.exists():
-            lines = env_path.read_text().splitlines()
-        new_lines = [l for l in lines if not l.startswith("OPENAI_API_KEY=")]
-        new_lines.append(f"OPENAI_API_KEY={key}")
-        env_path.write_text("\n".join(new_lines) + "\n")
-        config.OPENAI_API_KEY = key
-        os.environ["OPENAI_API_KEY"] = key
-        self._update_api_status()
-        QMessageBox.information(
-            self, "Saved",
-            "API key saved and active.\nReady to run AI validation."
-        )
+        try:
+            env_path = Path(os.path.join(_get_app_dir(), ".env"))
+            lines = []
+            if env_path.exists():
+                lines = env_path.read_text().splitlines()
+            new_lines = [l for l in lines if not l.startswith("OPENAI_API_KEY=")]
+            new_lines.append(f"OPENAI_API_KEY={key}")
+            env_path.write_text("\n".join(new_lines) + "\n")
+            config.OPENAI_API_KEY = key
+            os.environ["OPENAI_API_KEY"] = key
+            self._update_api_status()
+            QMessageBox.information(
+                self, "Saved",
+                "API key saved and active.\nReady to run AI validation."
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save key:\n{e}")
 
     def _update_api_status(self):
         if config.OPENAI_API_KEY and config.OPENAI_API_KEY.startswith("sk-"):
@@ -342,8 +345,7 @@ class SettingsPanel(QWidget):
             return
         try:
             from database.db_manager import DBManager
-            db = DBManager()
-            conn = db.get_connection()
+            conn = DBManager().get_connection()
             sid = scan["scan_id"]
             conn.execute(
                 "DELETE FROM validations WHERE finding_id IN "
