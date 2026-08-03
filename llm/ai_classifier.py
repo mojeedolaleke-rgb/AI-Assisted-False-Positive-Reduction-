@@ -32,7 +32,7 @@ def _call_openai(system_prompt: str, user_prompt: str, max_tokens=400) -> str:
                     {"role": "system", "content": system_prompt},
                     {"role": "user",   "content": user_prompt},
                 ],
-                temperature=0.1,
+                temperature=0,
                 max_tokens=max_tokens,
             )
             return response.choices[0].message.content.strip()

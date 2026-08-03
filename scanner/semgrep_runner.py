@@ -92,6 +92,26 @@ def _write_debug(content: str):
         pass
 
 
+# Fixed rule packs — replaces --config=auto so the same rules run every time,
+# on every machine, regardless of what Semgrep's auto-detection decides on the day.
+SEMGREP_CONFIGS = [
+    "--config=p/security-audit",
+    "--config=p/owasp-top-ten",
+    "--config=p/secrets",
+    "--config=p/python",
+    "--config=p/javascript",
+    "--config=p/typescript",
+    "--config=p/docker-compose",
+    "--config=p/sql-injection",
+    "--config=p/xss",
+    "--config=p/bandit",
+    "--config=p/flask",
+    "--config=p/command-injection",
+    "--config=p/django",   
+    "--config=p/trailofbits",    
+]
+
+
 def run_semgrep(target_path: str) -> dict:
     debug_lines = []
     debug_lines.append(f"=== SENTINEL SEMGREP DEBUG ===")
@@ -112,7 +132,7 @@ def run_semgrep(target_path: str) -> dict:
 
     cmd = [
         semgrep,
-        "--config=auto",
+        *SEMGREP_CONFIGS,
         "--json",
         "--quiet",
         "--no-git-ignore",
